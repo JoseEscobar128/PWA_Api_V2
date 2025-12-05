@@ -1,0 +1,1100 @@
+===============================================================================
+                       PWA API DOCUMENTATION
+                         Endpoints & Schemas
+===============================================================================
+
+BASE URL: http://localhost:8000/api/
+
+AUTHENTICATION: Bearer Token (Laravel Sanctum)
+  - Use header: Authorization: Bearer {token}
+  - Obtained from login endpoint
+
+===============================================================================
+                          AUTH ENDPOINTS
+===============================================================================
+
+1. REGISTER (Public)
+   METHOD: POST
+   URL: /api/register
+   AUTHENTICATION: No
+   
+   REQUEST BODY:
+   {
+     "name": "string (required)",
+     "last_name": "string (required)",
+     "email": "string|email|unique (required)",
+     "password": "string|min:8 (required)",
+     "password_confirmation": "string (required)"
+   }
+   
+   RESPONSE (201):
+   {
+     "success": true,
+     "data": {
+       "id": integer,
+       "name": "string",
+       "last_name": "string",
+       "email": "string",
+       "created_at": "datetime",
+       "updated_at": "datetime"
+     },
+     "message": "User registered successfully"
+   }
+   
+   ERROR (422):
+   {
+     "success": false,
+     "message": "Validation failed",
+     "errors": {
+       "email": ["The email has already been taken."],
+       "password": ["The password must be at least 8 characters."]
+     }
+   }
+
+---
+
+2. LOGIN (Public)
+   METHOD: POST
+   URL: /api/login
+   AUTHENTICATION: No
+   
+   REQUEST BODY:
+   {
+     "email": "string|email (required)",
+     "password": "string (required)"
+   }
+   
+   RESPONSE (200):
+   {
+     "success": true,
+     "data": {
+       "user": {
+         "id": integer,
+         "name": "string",
+         "last_name": "string",
+         "email": "string"
+       },
+       "token": "string"
+     },
+     "message": "Login successful"
+   }
+   
+   ERROR (401):
+   {
+     "success": false,
+     "message": "Invalid credentials"
+   }
+
+---
+
+3. LOGOUT (Authenticated)
+   METHOD: POST
+   URL: /api/logout
+   AUTHENTICATION: Required (Bearer Token)
+   
+   REQUEST BODY: {} (empty)
+   
+   RESPONSE (200):
+   {
+     "success": true,
+     "data": null,
+     "message": "Logged out successfully"
+   }
+   
+   ERROR (401):
+   {
+     "success": false,
+     "message": "Unauthenticated"
+   }
+
+===============================================================================
+                          USERS ENDPOINTS
+                    (Admin Only - role:admin)
+===============================================================================
+
+4. LIST ALL USERS (Admin Only)
+   METHOD: GET
+   URL: /api/users
+   AUTHENTICATION: Required (Bearer Token + Admin Role)
+   
+   REQUEST PARAMS: None
+   
+   RESPONSE (200):
+   {
+     "success": true,
+     "data": [
+       {
+         "id": integer,
+         "name": "string",
+         "last_name": "string",
+         "email": "string",
+         "email_verified_at": "datetime|null",
+         "created_at": "datetime",
+         "updated_at": "datetime"
+       },
+       ...
+     ]
+   }
+   
+   ERROR (403):
+   {
+     "success": false,
+     "message": "Forbidden"
+   }
+
+---
+
+5. GET SPECIFIC USER (Admin Only)
+   METHOD: GET
+   URL: /api/users/{id}
+   AUTHENTICATION: Required (Bearer Token + Admin Role)
+   
+   REQUEST PARAMS:
+   - id: integer (required, path param)
+   
+   RESPONSE (200):
+   {
+     "success": true,
+     "data": {
+       "id": integer,
+       "name": "string",
+       "last_name": "string",
+       "email": "string",
+       "email_verified_at": "datetime|null",
+       "created_at": "datetime",
+       "updated_at": "datetime"
+     }
+   }
+   
+   ERROR (404):
+   {
+     "success": false,
+     "message": "User not found"
+   }
+
+---
+
+6. CREATE USER (Admin Only)
+   METHOD: POST
+   URL: /api/users
+   AUTHENTICATION: Required (Bearer Token + Admin Role)
+   
+   REQUEST BODY:
+   {
+     "name": "string (required)",
+     "last_name": "string (required)",
+     "email": "string|email|unique (required)",
+     "password": "string|min:8 (required)"
+   }
+   
+   RESPONSE (201):
+   {
+     "success": true,
+     "data": {
+       "id": integer,
+       "name": "string",
+       "last_name": "string",
+       "email": "string",
+       "created_at": "datetime",
+       "updated_at": "datetime"
+     },
+     "message": "User created"
+   }
+   
+   ERROR (422):
+   {
+     "success": false,
+     "message": "Validation failed",
+     "errors": { ... }
+   }
+
+---
+
+7. UPDATE USER (Admin Only)
+   METHOD: PUT/PATCH
+   URL: /api/users/{id}
+   AUTHENTICATION: Required (Bearer Token + Admin Role)
+   
+   REQUEST PARAMS:
+   - id: integer (required, path param)
+   
+   REQUEST BODY:
+   {
+     "name": "string (optional)",
+     "last_name": "string (optional)",
+     "email": "string|email (optional)",
+     "password": "string|min:8 (optional)"
+   }
+   
+   RESPONSE (200):
+   {
+     "success": true,
+     "data": {
+       "id": integer,
+       "name": "string",
+       "last_name": "string",
+       "email": "string",
+       "updated_at": "datetime"
+     },
+     "message": "User updated"
+   }
+
+---
+
+8. DELETE USER (Admin Only)
+   METHOD: DELETE
+   URL: /api/users/{id}
+   AUTHENTICATION: Required (Bearer Token + Admin Role)
+   
+   REQUEST PARAMS:
+   - id: integer (required, path param)
+   
+   RESPONSE (200):
+   {
+     "success": true,
+     "data": null,
+     "message": "User deleted"
+   }
+
+===============================================================================
+                          PLACES ENDPOINTS
+                       (Authenticated Users)
+===============================================================================
+
+9. LIST ALL PLACES (Public via GET, Paginated)
+   METHOD: GET
+   URL: /api/places
+   AUTHENTICATION: Required (Bearer Token)
+   
+   REQUEST PARAMS:
+   - place_id: integer (optional, query param - for filtering)
+   
+   RESPONSE (200):
+   {
+     "success": true,
+     "data": [
+       {
+         "id": integer,
+         "user_id": integer,
+         "name": "string",
+         "description": "string|null",
+         "address": "string|null",
+         "lat": "decimal (10,7)",
+         "lng": "decimal (10,7)",
+         "category": "string|null",
+         "created_at": "datetime",
+         "updated_at": "datetime",
+         "deleted_at": "datetime|null",
+         "photos": [ ... ],
+         "reviews": [ ... ],
+         "votes": [ ... ]
+       },
+       ...
+     ]
+   }
+
+---
+
+10. GET SPECIFIC PLACE (Authenticated)
+    METHOD: GET
+    URL: /api/places/{id}
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST PARAMS:
+    - id: integer (required, path param)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "user_id": integer,
+        "name": "string",
+        "description": "string|null",
+        "address": "string|null",
+        "lat": "decimal (10,7)",
+        "lng": "decimal (10,7)",
+        "category": "string|null",
+        "created_at": "datetime",
+        "updated_at": "datetime",
+        "deleted_at": "datetime|null",
+        "photos": [
+          {
+            "id": integer,
+            "place_id": integer,
+            "user_id": integer,
+            "url": "string",
+            "description": "string|null",
+            "created_at": "datetime",
+            "updated_at": "datetime",
+            "deleted_at": "datetime|null"
+          }
+        ],
+        "reviews": [
+          {
+            "id": integer,
+            "place_id": integer,
+            "user_id": integer,
+            "rating": "integer (1-5)",
+            "comment": "string|null",
+            "created_at": "datetime",
+            "updated_at": "datetime",
+            "deleted_at": "datetime|null"
+          }
+        ],
+        "votes": [
+          {
+            "id": integer,
+            "place_id": integer,
+            "user_id": integer,
+            "created_at": "datetime",
+            "updated_at": "datetime",
+            "deleted_at": "datetime|null"
+          }
+        ]
+      }
+    }
+    
+    ERROR (404):
+    {
+      "success": false,
+      "message": "Place not found"
+    }
+
+---
+
+11. CREATE PLACE (Authenticated)
+    METHOD: POST
+    URL: /api/places
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST BODY:
+    {
+      "name": "string|max:255 (required)",
+      "description": "string|nullable (optional)",
+      "address": "string|max:255|nullable (optional)",
+      "lat": "numeric (required)",
+      "lng": "numeric (required)",
+      "category": "string|max:100|nullable (optional)"
+    }
+    
+    RESPONSE (201):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "user_id": integer,
+        "name": "string",
+        "description": "string|null",
+        "address": "string|null",
+        "lat": "decimal (10,7)",
+        "lng": "decimal (10,7)",
+        "category": "string|null",
+        "created_at": "datetime",
+        "updated_at": "datetime"
+      },
+      "message": "Place created"
+    }
+    
+    ERROR (422):
+    {
+      "success": false,
+      "message": "Validation failed",
+      "errors": {
+        "name": ["The name field is required."],
+        "lat": ["The lat field is required and must be numeric."]
+      }
+    }
+
+---
+
+12. UPDATE PLACE (Owner or Admin Only)
+    METHOD: PUT/PATCH
+    URL: /api/places/{id}
+    AUTHENTICATION: Required (Bearer Token)
+    AUTHORIZATION: User must be owner or have admin role
+    
+    REQUEST PARAMS:
+    - id: integer (required, path param)
+    
+    REQUEST BODY:
+    {
+      "name": "string|max:255 (optional)",
+      "description": "string|nullable (optional)",
+      "address": "string|max:255|nullable (optional)",
+      "lat": "numeric (optional)",
+      "lng": "numeric (optional)",
+      "category": "string|max:100|nullable (optional)"
+    }
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "user_id": integer,
+        "name": "string",
+        "description": "string|null",
+        "address": "string|null",
+        "lat": "decimal (10,7)",
+        "lng": "decimal (10,7)",
+        "category": "string|null",
+        "updated_at": "datetime"
+      },
+      "message": "Place updated"
+    }
+    
+    ERROR (403):
+    {
+      "success": false,
+      "message": "Forbidden"
+    }
+
+---
+
+13. DELETE PLACE (Owner or Admin Only - Soft Delete)
+    METHOD: DELETE
+    URL: /api/places/{id}
+    AUTHENTICATION: Required (Bearer Token)
+    AUTHORIZATION: User must be owner or have admin role
+    
+    REQUEST PARAMS:
+    - id: integer (required, path param)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": null,
+      "message": "Place deleted"
+    }
+    
+    ERROR (403):
+    {
+      "success": false,
+      "message": "Forbidden"
+    }
+
+===============================================================================
+                          PHOTOS ENDPOINTS
+                       (Authenticated Users)
+===============================================================================
+
+14. GET PHOTO (Public - No Authentication)
+    METHOD: GET
+    URL: /api/photos/{id}
+    AUTHENTICATION: Not Required
+    
+    REQUEST PARAMS:
+    - id: integer (required, path param)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "place_id": integer,
+        "user_id": integer,
+        "url": "string (storage path)",
+        "description": "string|null",
+        "created_at": "datetime",
+        "updated_at": "datetime",
+        "deleted_at": "datetime|null"
+      }
+    }
+    
+    ERROR (404):
+    {
+      "success": false,
+      "message": "Photo not found"
+    }
+
+---
+
+15. LIST PHOTOS (Authenticated - Optional place_id filter)
+    METHOD: GET
+    URL: /api/photos?place_id={id}
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST PARAMS:
+    - place_id: integer (optional, query param)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": [
+        {
+          "id": integer,
+          "place_id": integer,
+          "user_id": integer,
+          "url": "string",
+          "description": "string|null",
+          "created_at": "datetime",
+          "updated_at": "datetime",
+          "deleted_at": "datetime|null"
+        },
+        ...
+      ]
+    }
+
+---
+
+16. UPLOAD PHOTO (Authenticated)
+    METHOD: POST
+    URL: /api/photos
+    AUTHENTICATION: Required (Bearer Token)
+    CONTENT-TYPE: multipart/form-data
+    
+    REQUEST BODY (form-data):
+    - place_id: integer (required)
+    - photo: file|image|max:10240 (required, max 10MB)
+    - description: string|nullable (optional)
+    
+    RESPONSE (201):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "place_id": integer,
+        "user_id": integer,
+        "url": "string (storage path like: places/path/to/image.jpg)",
+        "description": "string|null",
+        "created_at": "datetime",
+        "updated_at": "datetime"
+      },
+      "message": "Photo uploaded"
+    }
+    
+    ERROR (422):
+    {
+      "success": false,
+      "message": "Validation failed",
+      "errors": {
+        "photo": ["The photo field must be an image."]
+      }
+    }
+
+---
+
+17. UPDATE PHOTO (Owner or Admin Only)
+    METHOD: PUT/PATCH
+    URL: /api/photos/{id}
+    AUTHENTICATION: Required (Bearer Token)
+    AUTHORIZATION: User must be owner or have admin role
+    CONTENT-TYPE: multipart/form-data
+    
+    REQUEST PARAMS:
+    - id: integer (required, path param)
+    
+    REQUEST BODY (form-data):
+    - photo: file|image|max:10240 (required)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "place_id": integer,
+        "user_id": integer,
+        "url": "string (new storage path)",
+        "description": "string|null",
+        "updated_at": "datetime"
+      },
+      "message": "Photo updated"
+    }
+    
+    ERROR (403):
+    {
+      "success": false,
+      "message": "Forbidden"
+    }
+
+---
+
+18. DELETE PHOTO (Owner or Admin Only - Soft Delete + File Removal)
+    METHOD: DELETE
+    URL: /api/photos/{id}
+    AUTHENTICATION: Required (Bearer Token)
+    AUTHORIZATION: User must be owner or have admin role
+    
+    REQUEST PARAMS:
+    - id: integer (required, path param)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": null,
+      "message": "Photo deleted"
+    }
+    
+    ERROR (403):
+    {
+      "success": false,
+      "message": "Forbidden"
+    }
+
+===============================================================================
+                         REVIEWS ENDPOINTS
+                       (Authenticated Users)
+===============================================================================
+
+19. LIST REVIEWS (Authenticated)
+    METHOD: GET
+    URL: /api/reviews
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST PARAMS: None
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": [
+        {
+          "id": integer,
+          "place_id": integer,
+          "user_id": integer,
+          "rating": "integer (1-5)",
+          "comment": "string|null",
+          "created_at": "datetime",
+          "updated_at": "datetime",
+          "deleted_at": "datetime|null",
+          "user": {
+            "id": integer,
+            "name": "string",
+            "last_name": "string",
+            "email": "string"
+          },
+          "place": {
+            "id": integer,
+            "name": "string"
+          }
+        },
+        ...
+      ]
+    }
+
+---
+
+20. GET SPECIFIC REVIEW (Authenticated)
+    METHOD: GET
+    URL: /api/reviews/{id}
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST PARAMS:
+    - id: integer (required, path param)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "place_id": integer,
+        "user_id": integer,
+        "rating": "integer (1-5)",
+        "comment": "string|null",
+        "created_at": "datetime",
+        "updated_at": "datetime",
+        "deleted_at": "datetime|null",
+        "user": {
+          "id": integer,
+          "name": "string",
+          "email": "string"
+        }
+      }
+    }
+
+---
+
+21. CREATE REVIEW (Authenticated)
+    METHOD: POST
+    URL: /api/reviews
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST BODY:
+    {
+      "place_id": "integer|exists:places,id (required)",
+      "rating": "integer|min:1|max:5 (required)",
+      "comment": "string|nullable (optional)"
+    }
+    
+    RESPONSE (201):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "place_id": integer,
+        "user_id": integer,
+        "rating": "integer (1-5)",
+        "comment": "string|null",
+        "created_at": "datetime",
+        "updated_at": "datetime"
+      },
+      "message": "Review created"
+    }
+    
+    ERROR (422):
+    {
+      "success": false,
+      "message": "Validation failed",
+      "errors": {
+        "rating": ["The rating must be between 1 and 5."]
+      }
+    }
+
+---
+
+22. UPDATE REVIEW (Owner or Admin Only)
+    METHOD: PUT/PATCH
+    URL: /api/reviews/{id}
+    AUTHENTICATION: Required (Bearer Token)
+    AUTHORIZATION: User must be owner or have admin role
+    
+    REQUEST PARAMS:
+    - id: integer (required, path param)
+    
+    REQUEST BODY:
+    {
+      "rating": "integer|min:1|max:5 (optional)",
+      "comment": "string|nullable (optional)"
+    }
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "place_id": integer,
+        "user_id": integer,
+        "rating": "integer (1-5)",
+        "comment": "string|null",
+        "updated_at": "datetime"
+      },
+      "message": "Review updated"
+    }
+
+---
+
+23. DELETE REVIEW (Owner or Admin Only - Soft Delete)
+    METHOD: DELETE
+    URL: /api/reviews/{id}
+    AUTHENTICATION: Required (Bearer Token)
+    AUTHORIZATION: User must be owner or have admin role
+    
+    REQUEST PARAMS:
+    - id: integer (required, path param)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": null,
+      "message": "Review deleted"
+    }
+
+===============================================================================
+                      PLACE VOTES ENDPOINTS
+                       (Authenticated Users)
+===============================================================================
+
+24. LIST VOTES FOR PLACE (Authenticated - Optional filter)
+    METHOD: GET
+    URL: /api/votes?place_id={id}
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST PARAMS:
+    - place_id: integer (optional, query param)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": [
+        {
+          "id": integer,
+          "place_id": integer,
+          "user_id": integer,
+          "created_at": "datetime",
+          "updated_at": "datetime",
+          "deleted_at": "datetime|null"
+        },
+        ...
+      ]
+    }
+
+---
+
+25. CHECK IF USER VOTED (Authenticated)
+    METHOD: GET
+    URL: /api/votes/{place_id}
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST PARAMS:
+    - place_id: integer (required, path param)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": {
+        "voted": true|false,
+        "data": {
+          "id": integer,
+          "place_id": integer,
+          "user_id": integer,
+          "created_at": "datetime"
+        } | null
+      }
+    }
+
+---
+
+26. VOTE FOR PLACE (Authenticated - One Vote Per User/Place)
+    METHOD: POST
+    URL: /api/votes
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST BODY:
+    {
+      "place_id": "integer|exists:places,id (required)"
+    }
+    
+    RESPONSE (201):
+    {
+      "success": true,
+      "data": {
+        "id": integer,
+        "place_id": integer,
+        "user_id": integer,
+        "created_at": "datetime",
+        "updated_at": "datetime"
+      },
+      "message": "Voted successfully"
+    }
+    
+    NOTE: If user already voted for this place, returns existing vote record without creating duplicate.
+
+---
+
+27. REMOVE VOTE (Authenticated)
+    METHOD: DELETE
+    URL: /api/votes/{place_id}
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST PARAMS:
+    - place_id: integer (required, path param)
+    
+    REQUEST BODY: {} (empty or form-data with place_id field)
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "data": null,
+      "message": "Vote removed"
+    }
+
+===============================================================================
+                        ERROR RESPONSES
+===============================================================================
+
+Standard error format for all endpoints:
+
+1. VALIDATION ERROR (422)
+   {
+     "success": false,
+     "message": "Validation failed",
+     "errors": {
+       "field_name": ["Error message 1", "Error message 2"]
+     }
+   }
+
+2. AUTHENTICATION ERROR (401)
+   {
+     "success": false,
+     "message": "Unauthenticated"
+   }
+
+3. AUTHORIZATION ERROR (403)
+   {
+     "success": false,
+     "message": "Forbidden"
+   }
+
+4. NOT FOUND ERROR (404)
+   {
+     "success": false,
+     "message": "Resource not found"
+   }
+
+5. SERVER ERROR (500)
+   {
+     "success": false,
+     "message": "Failed to [operation]",
+     "errors": "Error details"
+   }
+
+===============================================================================
+                     AUTHORIZATION MATRIX
+===============================================================================
+
+Endpoint                 | Public | Auth | Owner | Admin | Role
+-------------------------+--------+------+-------+-------+-----
+POST /register           |   ✓    |      |       |       | -
+POST /login              |   ✓    |      |       |       | -
+POST /logout             |        |  ✓   |       |       | -
+GET  /users              |        |  ✓   |       |   ✓   | admin
+GET  /users/{id}         |        |  ✓   |       |   ✓   | admin
+POST /users              |        |  ✓   |       |   ✓   | admin
+PUT  /users/{id}         |        |  ✓   |       |   ✓   | admin
+DEL  /users/{id}         |        |  ✓   |       |   ✓   | admin
+GET  /places             |        |  ✓   |       |       | -
+GET  /places/{id}        |        |  ✓   |       |       | -
+POST /places             |        |  ✓   |       |       | -
+PUT  /places/{id}        |        |  ✓   |   ✓   |   ✓   | -
+DEL  /places/{id}        |        |  ✓   |   ✓   |   ✓   | -
+GET  /photos/{id}        |   ✓    |      |       |       | -
+GET  /photos             |        |  ✓   |       |       | -
+POST /photos             |        |  ✓   |       |       | -
+PUT  /photos/{id}        |        |  ✓   |   ✓   |   ✓   | -
+DEL  /photos/{id}        |        |  ✓   |   ✓   |   ✓   | -
+GET  /reviews            |        |  ✓   |       |       | -
+GET  /reviews/{id}       |        |  ✓   |       |       | -
+POST /reviews            |        |  ✓   |       |       | -
+PUT  /reviews/{id}       |        |  ✓   |   ✓   |   ✓   | -
+DEL  /reviews/{id}       |        |  ✓   |   ✓   |   ✓   | -
+GET  /votes              |        |  ✓   |       |       | -
+GET  /votes/{place_id}   |        |  ✓   |       |       | -
+POST /votes              |        |  ✓   |       |       | -
+DEL  /votes/{place_id}   |        |  ✓   |       |       | -
+
+Legend:
+  Public = No auth needed
+  Auth   = Bearer token required
+  Owner  = User must be creator/owner OR have admin role
+  Admin  = User must have admin role
+  Role   = Role requirement (if any)
+
+===============================================================================
+                         COMMON HEADERS
+===============================================================================
+
+For all authenticated endpoints, include:
+  Authorization: Bearer {token}
+
+For requests with JSON body:
+  Content-Type: application/json
+
+For requests with file uploads (photos):
+  Content-Type: multipart/form-data
+  Authorization: Bearer {token}
+
+===============================================================================
+                        USAGE EXAMPLES
+===============================================================================
+
+EXAMPLE 1: Register a User
+  curl -X POST http://localhost:8000/api/register \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "John",
+      "last_name": "Doe",
+      "email": "john@example.com",
+      "password": "password123",
+      "password_confirmation": "password123"
+    }'
+
+EXAMPLE 2: Login
+  curl -X POST http://localhost:8000/api/login \
+    -H "Content-Type: application/json" \
+    -d '{
+      "email": "john@example.com",
+      "password": "password123"
+    }'
+  
+  Response contains "token" — use it for authenticated requests.
+
+EXAMPLE 3: Create a Place
+  curl -X POST http://localhost:8000/api/places \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer {token}" \
+    -d '{
+      "name": "Parque Central",
+      "description": "A beautiful park",
+      "address": "Calle Principal 123",
+      "lat": 10.123456,
+      "lng": -84.567890,
+      "category": "Park"
+    }'
+
+EXAMPLE 4: Upload a Photo
+  curl -X POST http://localhost:8000/api/photos \
+    -H "Authorization: Bearer {token}" \
+    -F "place_id=1" \
+    -F "photo=@/path/to/photo.jpg"
+
+EXAMPLE 5: Create a Review
+  curl -X POST http://localhost:8000/api/reviews \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer {token}" \
+    -d '{
+      "place_id": 1,
+      "rating": 4,
+      "comment": "Great place to visit!"
+    }'
+
+EXAMPLE 6: Vote for a Place
+  curl -X POST http://localhost:8000/api/votes \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer {token}" \
+    -d '{
+      "place_id": 1
+    }'
+
+EXAMPLE 7: Check if User Voted
+  curl -X GET http://localhost:8000/api/votes/1 \
+    -H "Authorization: Bearer {token}"
+
+EXAMPLE 8: Remove Vote
+  curl -X DELETE http://localhost:8000/api/votes/1 \
+    -H "Authorization: Bearer {token}"
+
+===============================================================================
+                         SOFT DELETE NOTES
+===============================================================================
+
+The following resources support soft deletes (marked as deleted but not removed):
+  - Places (deleted_at field)
+  - Photos (deleted_at field)
+  - Reviews (deleted_at field)
+  - PlaceVotes (deleted_at field)
+
+When querying, soft-deleted records are automatically excluded by default.
+To include/restore soft-deleted records, admin policies would need to be extended.
+
+===============================================================================
+                         FEATURES SUMMARY
+===============================================================================
+
+✓ Role-based access control (RBAC)
+  - Admin role: can manage users, edit/delete any resource
+  - User role: can create own resources, edit/delete own content
+
+✓ Standardized JSON responses
+  - All endpoints return { success, data, message?, errors? }
+  - Consistent error format
+
+✓ Validation
+  - All inputs validated
+  - Field-level error responses
+
+✓ Soft deletes
+  - Deleted records remain in database with deleted_at timestamp
+
+✓ Relationship loading
+  - Places returned with photos, reviews, votes
+  - Reviews returned with user and place data
+
+✓ File uploads
+  - Photos stored in public/storage/places/
+  - Old files deleted when replaced
+
+✓ Ownership checks
+  - Users can only edit/delete their own resources
+  - Admins can edit/delete any resource
+
+===============================================================================
