@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Photo;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Traits\ApiResponse;
 
@@ -47,7 +48,7 @@ class PhotoController extends Controller
             ]);
 
             // Verificar que el lugar existe sin eager load
-            if (!$placeExists = \DB::table('places')->where('id', $data['place_id'])->exists()) {
+            if (!$placeExists = DB::table('places')->where('id', $data['place_id'])->exists()) {
                 return $this->error('Validation failed', ['place_id' => ['The selected place does not exist.']], 422);
             }
 
@@ -115,7 +116,8 @@ class PhotoController extends Controller
             }
 
             $data = $request->validate([
-                'photo' => 'required|image|max:10240'
+                'photo' => 'required|image|max:10240',
+                'description' => 'nullable|string'
             ]);
 
             if (Storage::disk('public')->exists($photo->url)) {
@@ -124,9 +126,12 @@ class PhotoController extends Controller
 
             $path = $request->file('photo')->store('places', 'public');
 
-            $photo->update([
-                'url' => $path
-            ]);
+            $updateData = ['url' => $path];
+            if (isset($data['description'])) {
+                $updateData['description'] = $data['description'];
+            }
+
+            $photo->update($updateData);
 
             return $this->success($photo, 'Photo updated');
         } catch (\Illuminate\Validation\ValidationException $ve) {

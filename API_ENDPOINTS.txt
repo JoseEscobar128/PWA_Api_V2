@@ -20,8 +20,8 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
    
    REQUEST BODY:
    {
-     "name": "string (required)",
-     "last_name": "string (required)",
+     "name": "string|min:2|max:255 (required)",
+     "last_name": "string|min:2|max:255 (required)",
      "email": "string|email|unique (required)",
      "password": "string|min:8 (required)",
      "password_confirmation": "string (required)"
@@ -38,6 +38,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
        "created_at": "datetime",
        "updated_at": "datetime"
      },
+     "token": "string",
      "message": "User registered successfully"
    }
    
@@ -61,7 +62,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
    REQUEST BODY:
    {
      "email": "string|email (required)",
-     "password": "string (required)"
+     "password": "string|min:8 (required)"
    }
    
    RESPONSE (200):
@@ -181,8 +182,8 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
    
    REQUEST BODY:
    {
-     "name": "string (required)",
-     "last_name": "string (required)",
+     "name": "string|min:2|max:255 (required)",
+     "last_name": "string|min:2|max:255 (required)",
      "email": "string|email|unique (required)",
      "password": "string|min:8 (required)"
    }
@@ -220,8 +221,8 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
    
    REQUEST BODY:
    {
-     "name": "string (optional)",
-     "last_name": "string (optional)",
+     "name": "string|min:2|max:255 (optional)",
+     "last_name": "string|min:2|max:255 (optional)",
      "email": "string|email (optional)",
      "password": "string|min:8 (optional)"
    }
@@ -587,6 +588,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
     
     REQUEST BODY (form-data):
     - photo: file|image|max:10240 (required)
+    - description: string|nullable (optional)
     
     RESPONSE (200):
     {
@@ -794,7 +796,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
                        (Authenticated Users)
 ===============================================================================
 
-24. LIST VOTES FOR PLACE (Authenticated - Optional filter)
+24. LIST VOTES (Authenticated - Optional place_id filter)
     METHOD: GET
     URL: /api/votes?place_id={id}
     AUTHENTICATION: Required (Bearer Token)
@@ -879,12 +881,11 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
     REQUEST PARAMS:
     - place_id: integer (required, path param)
     
-    REQUEST BODY: {} (empty or form-data with place_id field)
+    REQUEST BODY: {} (empty)
     
     RESPONSE (200):
     {
       "success": true,
-      "data": null,
       "message": "Vote removed"
     }
 
