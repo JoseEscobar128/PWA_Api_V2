@@ -48,18 +48,29 @@ class PushSubscriptionController extends Controller
                 'user_type' => get_class($user)
             ]);
             
-            PushSubscription::updateOrCreate(
-                [
+            // Buscar suscripción existente por endpoint
+            $subscription = PushSubscription::where('endpoint', $request->endpoint)->first();
+            
+            if ($subscription) {
+                // Actualizar suscripción existente
+                $subscription->update([
                     'subscribable_type' => get_class($user),
                     'subscribable_id' => $user->id,
-                    'endpoint' => $request->endpoint
-                ],
-                [
                     'public_key' => $request->input('keys.p256dh'),
                     'auth_token' => $request->input('keys.auth'),
                     'content_encoding' => 'aesgcm'
-                ]
-            );
+                ]);
+            } else {
+                // Crear nueva suscripción
+                PushSubscription::create([
+                    'subscribable_type' => get_class($user),
+                    'subscribable_id' => $user->id,
+                    'endpoint' => $request->endpoint,
+                    'public_key' => $request->input('keys.p256dh'),
+                    'auth_token' => $request->input('keys.auth'),
+                    'content_encoding' => 'aesgcm'
+                ]);
+            }
 
             Log::info('✅ Suscripción guardada exitosamente');
 
