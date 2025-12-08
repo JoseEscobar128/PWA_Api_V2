@@ -97,9 +97,36 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
    
    RESPONSE (200):
    {
+     "message": "Sesión cerrada"
+   }
+   
+   ERROR (401):
+   {
+     "success": false,
+     "message": "Unauthenticated"
+   }
+
+---
+
+4. GET CURRENT USER (Authenticated)
+   METHOD: GET
+   URL: /api/me
+   AUTHENTICATION: Required (Bearer Token)
+   
+   REQUEST BODY: None
+   
+   RESPONSE (200):
+   {
      "success": true,
-     "data": null,
-     "message": "Logged out successfully"
+     "data": {
+       "id": integer,
+       "name": "string",
+       "last_name": "string",
+       "email": "string",
+       "roles": ["user", "admin"],
+       "created_at": "datetime",
+       "updated_at": "datetime"
+     }
    }
    
    ERROR (401):
