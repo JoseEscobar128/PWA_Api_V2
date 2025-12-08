@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Role;
+use NotificationChannels\WebPush\PushSubscription;
 
 class User extends Authenticatable
 {
@@ -59,6 +60,18 @@ class User extends Authenticatable
         $roles = is_array($roles) ? $roles : [$roles];
 
         return $this->roles()->whereIn('name', $roles)->exists();
+    }
+
+    /**
+     * Get the push subscriptions for web push notifications.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function routeNotificationForWebPush()
+    {
+        return PushSubscription::where('subscribable_type', self::class)
+            ->where('subscribable_id', $this->id)
+            ->get();
     }
 
     /**
