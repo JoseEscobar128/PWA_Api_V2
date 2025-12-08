@@ -6,6 +6,7 @@ use App\Models\Place;
 use App\Models\PlaceVote;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Traits\ApiResponse;
+use App\Notifications\NewVoteNotification;
 
 class PlaceVoteController extends Controller
 {
@@ -70,6 +71,14 @@ class PlaceVoteController extends Controller
                     'place_id' => $placeId,
                     'user_id' => $userId,
                 ]);
+            }
+
+            // Enviar notificación push al dueño del lugar
+            $place = Place::with('user')->find($placeId);
+            if ($place && $place->user_id !== $userId) {
+                $voterName = $request->user()->name . ' ' . $request->user()->last_name;
+                $totalVotes = PlaceVote::where('place_id', $placeId)->count();
+                $place->user->notify(new NewVoteNotification($place, $voterName, $totalVotes));
             }
 
             // Return a simple response without relationships to avoid slow serialization

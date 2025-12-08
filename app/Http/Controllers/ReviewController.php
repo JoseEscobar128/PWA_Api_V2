@@ -2,8 +2,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Review;
+use App\Models\Place;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Traits\ApiResponse;
+use App\Notifications\NewReviewNotification;
 
 class ReviewController extends Controller
 {
@@ -43,6 +45,13 @@ class ReviewController extends Controller
 
             $review = Review::create($data);
             $review->load('user');
+
+            // Enviar notificación push al dueño del lugar
+            $place = Place::with('user')->find($data['place_id']);
+            if ($place && $place->user_id !== $request->user()->id) {
+                $reviewerName = $request->user()->name . ' ' . $request->user()->last_name;
+                $place->user->notify(new NewReviewNotification($review, $place, $reviewerName));
+            }
 
             return $this->success($review, 'Review created', 201);
         } catch (\Illuminate\Validation\ValidationException $ve) {
