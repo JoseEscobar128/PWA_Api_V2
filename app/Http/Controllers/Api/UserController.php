@@ -13,10 +13,24 @@ class UserController extends Controller
     public function index()
     {
         try {
-            $users = User::all();
+            $users = User::with('roles')->get();
+            
+            $usersData = $users->map(function($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'last_name' => $user->last_name,
+                    'email' => $user->email,
+                    'email_verified_at' => $user->email_verified_at,
+                    'roles' => $user->roles->pluck('name'),
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at
+                ];
+            });
+            
             return response()->json([
                 'success' => true,
-                'data' => $users
+                'data' => $usersData
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -34,7 +48,7 @@ class UserController extends Controller
             $validated = $request->validate([
                 'name'      => 'required|string|min:2|max:255',
                 'last_name' => 'required|string|min:2|max:255',
-                'email'     => 'required|email|unique:users',
+                'email'     => 'required|email|unique:users,email,NULL,id,deleted_at,NULL',
                 'password'  => 'required|min:8',
             ]);
 
@@ -73,7 +87,7 @@ class UserController extends Controller
     public function show($id)
     {
         try {
-            $user = User::findOrFail($id);
+            $user = User::with('roles')->findOrFail($id);
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -82,6 +96,7 @@ class UserController extends Controller
                     'last_name' => $user->last_name,
                     'email' => $user->email,
                     'email_verified_at' => $user->email_verified_at,
+                    'roles' => $user->roles->pluck('name'),
                     'created_at' => $user->created_at,
                     'updated_at' => $user->updated_at
                 ]
@@ -109,7 +124,7 @@ class UserController extends Controller
             $validated = $request->validate([
                 'name'      => 'sometimes|string|min:2|max:255',
                 'last_name' => 'sometimes|string|min:2|max:255',
-                'email'     => 'sometimes|email|unique:users,email,' . $user->id,
+                'email'     => 'sometimes|email|unique:users,email,' . $user->id . ',id,deleted_at,NULL',
                 'password'  => 'sometimes|min:8',
             ]);
 
