@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use NotificationChannels\WebPush\PushSubscription;
+use Illuminate\Support\Facades\Log;
 
 class PushSubscriptionController extends Controller
 {
@@ -15,6 +16,26 @@ class PushSubscriptionController extends Controller
      */
     public function store(Request $request)
     {
+        Log::info('📥 Recibiendo suscripción push', [
+            'headers' => $request->headers->all(),
+            'has_bearer' => $request->bearerToken() ? 'YES' : 'NO',
+            'token_preview' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
+            'user_id' => $request->user()?->id,
+            'endpoint' => $request->endpoint,
+            'has_auth' => !empty($request->input('keys.auth')),
+            'has_p256dh' => !empty($request->input('keys.p256dh'))
+        ]);
+
+        // Verificar autenticación ANTES de validar
+        $user = $request->user();
+        if (!$user) {
+            Log::error('❌ Usuario NO autenticado');
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated'
+            ], 401);
+        }
+
         $request->validate([
             'endpoint' => 'required|url',
             'keys.auth' => 'required|string',
@@ -22,7 +43,10 @@ class PushSubscriptionController extends Controller
         ]);
 
         try {
-            $user = $request->user();
+            Log::info('💾 Guardando suscripción', [
+                'user_id' => $user->id,
+                'user_type' => get_class($user)
+            ]);
             
             PushSubscription::updateOrCreate(
                 [
@@ -37,15 +61,23 @@ class PushSubscriptionController extends Controller
                 ]
             );
 
+            Log::info('✅ Suscripción guardada exitosamente');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Push subscription saved successfully'
             ], 200);
         } catch (\Exception $e) {
+            Log::error('❌ Error guardando suscripción push', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to save subscription',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'debug' => config('app.debug') ? $e->getTraceAsString() : null
             ], 500);
         }
     }
