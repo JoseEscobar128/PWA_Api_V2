@@ -107,6 +107,20 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        $user = $request->user();
+        $user->load('roles');
+        
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+                'roles' => $user->roles->pluck('name'),
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at
+            ]
+        ]);
     }
 }

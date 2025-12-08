@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -16,20 +17,29 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Primero crear los roles
+        $this->call(RoleSeeder::class);
+
+        // Obtener los roles
+        $adminRole = Role::where('name', 'admin')->first();
+        $userRole = Role::where('name', 'user')->first();
+
+        // Crear usuario administrador
+        $admin = User::create([
+            'name' => 'Admin',
+            'last_name' => 'Administrator',
+            'email' => 'admin@example.com',
+            'password' => Hash::make('admin123456'),
+        ]);
+        $admin->roles()->attach($adminRole->id);
+
         // Crear usuario de prueba
-        User::create([
+        $testUser = User::create([
             'name' => 'Test',
             'last_name' => 'User',
             'email' => 'test@example.com',
-            'password' => Hash::make('123456'),
+            'password' => Hash::make('test123456'),
         ]);
-
-        // Crear usuario adicional
-        User::create([
-            'name' => 'Admin',
-            'last_name' => 'Admin',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('123456'),
-        ]);
+        $testUser->roles()->attach($userRole->id);
     }
 }
