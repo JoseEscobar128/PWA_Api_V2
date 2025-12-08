@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use NotificationChannels\WebPush\PushSubscription;
 
 class PushSubscriptionController extends Controller
 {
@@ -23,10 +24,17 @@ class PushSubscriptionController extends Controller
         try {
             $user = $request->user();
             
-            $user->updatePushSubscription(
-                $request->endpoint,
-                $request->input('keys.p256dh'),
-                $request->input('keys.auth')
+            PushSubscription::updateOrCreate(
+                [
+                    'subscribable_type' => get_class($user),
+                    'subscribable_id' => $user->id,
+                    'endpoint' => $request->endpoint
+                ],
+                [
+                    'public_key' => $request->input('keys.p256dh'),
+                    'auth_token' => $request->input('keys.auth'),
+                    'content_encoding' => 'aesgcm'
+                ]
             );
 
             return response()->json([
@@ -55,7 +63,12 @@ class PushSubscriptionController extends Controller
         ]);
 
         try {
-            $request->user()->deletePushSubscription($request->endpoint);
+            $user = $request->user();
+            
+            PushSubscription::where('subscribable_type', get_class($user))
+                ->where('subscribable_id', $user->id)
+                ->where('endpoint', $request->endpoint)
+                ->delete();
 
             return response()->json([
                 'success' => true,

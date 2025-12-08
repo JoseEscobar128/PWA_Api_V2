@@ -7,6 +7,7 @@ use App\Models\PlaceVote;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Traits\ApiResponse;
 use App\Notifications\NewVoteNotification;
+use Illuminate\Support\Facades\Log;
 
 class PlaceVoteController extends Controller
 {
@@ -91,7 +92,7 @@ class PlaceVoteController extends Controller
                 ]
             ], 201);
         } catch (\Exception $e) {
-            \Log::error('Vote creation error: ' . $e->getMessage());
+            Log::error('Vote creation error: ' . $e->getMessage());
             return $this->error('Failed to vote', $e->getMessage(), 500);
         }
     }
