@@ -8,6 +8,7 @@ use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\PlaceVoteController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\PushSubscriptionController;
 
 /*
 Route::get('/user', function (Request $request) {
@@ -57,4 +58,11 @@ Route::get('/photos/{id}', [PhotoController::class, 'show']);
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('reviews', ReviewController::class)->except(['create', 'edit']);
+    
+    // Push Notifications
+    Route::post('/save-subscription', [PushSubscriptionController::class, 'store']);
+    Route::post('/delete-subscription', [PushSubscriptionController::class, 'destroy']);
 });
+
+// Public endpoint for VAPID public key
+Route::get('/vapid-public-key', [PushSubscriptionController::class, 'publicKey']);
