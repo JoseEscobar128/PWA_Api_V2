@@ -15,83 +15,75 @@ class PushSubscriptionController extends Controller
      * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request)
-    {
-        Log::info('📥 Recibiendo suscripción push', [
-            'headers' => $request->headers->all(),
-            'has_bearer' => $request->bearerToken() ? 'YES' : 'NO',
-            'token_preview' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
-            'user_id' => $request->user()?->id,
-            'endpoint' => $request->endpoint,
-            'has_auth' => !empty($request->input('keys.auth')),
-            'has_p256dh' => !empty($request->input('keys.p256dh'))
-        ]);
+{
+    Log::info('📥 Recibiendo suscripción push', [
+        'headers' => $request->headers->all(),
+        'has_bearer' => $request->bearerToken() ? 'YES' : 'NO',
+        'token_preview' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
+        'user_id' => $request->user()?->id,
+        'endpoint' => $request->endpoint,
+        'has_auth' => !empty($request->input('keys.auth')),
+        'has_p256dh' => !empty($request->input('keys.p256dh'))
+    ]);
 
-        // Verificar autenticación ANTES de validar
-        $user = $request->user();
-        if (!$user) {
-            Log::error('❌ Usuario NO autenticado');
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated'
-            ], 401);
-        }
-
-        $request->validate([
-            'endpoint' => 'required|url',
-            'keys.auth' => 'required|string',
-            'keys.p256dh' => 'required|string'
-        ]);
-
-        try {
-            Log::info('💾 Guardando suscripción', [
-                'user_id' => $user->id,
-                'user_type' => get_class($user)
-            ]);
-            
-            // Buscar suscripción existente por endpoint
-            $subscription = PushSubscription::where('endpoint', $request->endpoint)->first();
-            
-            if ($subscription) {
-                // Actualizar suscripción existente
-                $subscription->update([
-                    'subscribable_type' => get_class($user),
-                    'subscribable_id' => $user->id,
-                    'public_key' => $request->input('keys.p256dh'),
-                    'auth_token' => $request->input('keys.auth'),
-                    'content_encoding' => 'aesgcm'
-                ]);
-            } else {
-                // Crear nueva suscripción
-                PushSubscription::create([
-                    'subscribable_type' => get_class($user),
-                    'subscribable_id' => $user->id,
-                    'endpoint' => $request->endpoint,
-                    'public_key' => $request->input('keys.p256dh'),
-                    'auth_token' => $request->input('keys.auth'),
-                    'content_encoding' => 'aesgcm'
-                ]);
-            }
-
-            Log::info('✅ Suscripción guardada exitosamente');
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Push subscription saved successfully'
-            ], 200);
-        } catch (\Exception $e) {
-            Log::error('❌ Error guardando suscripción push', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to save subscription',
-                'error' => $e->getMessage(),
-                'debug' => config('app.debug') ? $e->getTraceAsString() : null
-            ], 500);
-        }
+    // Verificar autenticación ANTES de validar
+    $user = $request->user();
+    if (!$user) {
+        Log::error('❌ Usuario NO autenticado');
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated'
+        ], 401);
     }
+
+    $validated = $request->validate([
+        'endpoint' => 'required|url',
+        'keys.auth' => 'required|string',
+        'keys.p256dh' => 'required|string'
+    ]);
+
+    try {
+        Log::info('💾 Guardando suscripción', [
+            'user_id' => $user->id,
+            'user_type' => get_class($user)
+        ]);
+        
+        // Usar updateOrCreate directamente con campos polimórficos
+        $subscription = PushSubscription::updateOrCreate(
+            [
+                'subscribable_type' => get_class($user),
+                'subscribable_id' => $user->id,
+                'endpoint' => $validated['endpoint']
+            ],
+            [
+                'public_key' => $validated['keys']['p256dh'],
+                'auth_token' => $validated['keys']['auth'],
+                'content_encoding' => 'aesgcm'
+            ]
+        );
+
+        Log::info('✅ Suscripción guardada exitosamente', [
+            'subscription_id' => $subscription->id
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Push subscription saved successfully'
+        ], 200);
+    } catch (\Exception $e) {
+        Log::error('❌ Error guardando suscripción push', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to save subscription',
+            'error' => $e->getMessage(),
+            'debug' => config('app.debug') ? $e->getTraceAsString() : null
+        ], 500);
+    }
+}
 
     /**
      * Delete a push subscription for the authenticated user.
