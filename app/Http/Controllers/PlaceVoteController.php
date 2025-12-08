@@ -75,11 +75,16 @@ class PlaceVoteController extends Controller
             }
 
             // Enviar notificación push al dueño del lugar
-            $place = Place::with('user')->find($placeId);
-            if ($place && $place->user_id !== $userId) {
-                $voterName = $request->user()->name . ' ' . $request->user()->last_name;
-                $totalVotes = PlaceVote::where('place_id', $placeId)->count();
-                $place->user->notify(new NewVoteNotification($place, $voterName, $totalVotes));
+            try {
+                $place = Place::with('user')->find($placeId);
+                if ($place && $place->user_id !== $userId) {
+                    $voterName = $request->user()->name . ' ' . $request->user()->last_name;
+                    $totalVotes = PlaceVote::where('place_id', $placeId)->count();
+                    $place->user->notify(new NewVoteNotification($place, $voterName, $totalVotes));
+                }
+            } catch (\Exception $notificationError) {
+                // Log notification error but don't fail the vote creation
+                Log::warning('Failed to send vote notification: ' . $notificationError->getMessage());
             }
 
             // Return a simple response without relationships to avoid slow serialization
