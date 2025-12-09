@@ -57,11 +57,31 @@ class AuthController extends Controller
         try {
             $data = $request->validate([
                 'email' => 'required|email',
-                'password' => 'required|min:8'
+                'password' => 'required|min:8',
+                'recaptchaResponse' => 'required|string', // <--- nuevo
             ]);
 
+            // Validar reCAPTCHA con Google
+            $response = \Illuminate\Support\Facades\Http::asForm()->post(
+                'https://www.google.com/recaptcha/api/siteverify',
+                [
+                    'secret' => env('RECAPTCHA_SECRET'),
+                    'response' => $data['recaptchaResponse'],
+                ]
+            );
+
+            $body = $response->json();
+
+            if (empty($body['success']) || $body['success'] !== true) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Captcha no válido'
+                ], 422);
+            }
+
+            // Verificar usuario y contraseña
             $user = User::where('email', $data['email'])->first();
-            if (!$user || !Hash::check($data['password'], $user->password)) {
+            if (!$user || !\Illuminate\Support\Facades\Hash::check($data['password'], $user->password)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials'
@@ -69,7 +89,7 @@ class AuthController extends Controller
             }
 
             $token = $user->createToken('auth_token')->plainTextToken;
-            
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -98,6 +118,7 @@ class AuthController extends Controller
         }
     }
 
+
     public function logout(Request $request)
     {
         $request->user()->tokens()->delete();
@@ -109,7 +130,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
         $user->load('roles');
-        
+
         return response()->json([
             'success' => true,
             'data' => [
