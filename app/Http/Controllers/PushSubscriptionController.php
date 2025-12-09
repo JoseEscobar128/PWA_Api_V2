@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use NotificationChannels\WebPush\PushSubscription;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class PushSubscriptionController extends Controller
 {
@@ -48,23 +49,38 @@ class PushSubscriptionController extends Controller
             'user_type' => get_class($user)
         ]);
         
-        // Usar updateOrCreate directamente con campos polimórficos
-        $subscription = PushSubscription::updateOrCreate(
-            [
+        // Usar DB directamente para evitar restricciones del modelo
+        $existing = DB::table('push_subscriptions')
+            ->where('endpoint', $validated['endpoint'])
+            ->first();
+        
+        if ($existing) {
+            // Actualizar suscripción existente
+            DB::table('push_subscriptions')
+                ->where('endpoint', $validated['endpoint'])
+                ->update([
+                    'subscribable_type' => get_class($user),
+                    'subscribable_id' => $user->id,
+                    'public_key' => $validated['keys']['p256dh'],
+                    'auth_token' => $validated['keys']['auth'],
+                    'content_encoding' => 'aesgcm',
+                    'updated_at' => now()
+                ]);
+        } else {
+            // Crear nueva suscripción
+            DB::table('push_subscriptions')->insert([
                 'subscribable_type' => get_class($user),
                 'subscribable_id' => $user->id,
-                'endpoint' => $validated['endpoint']
-            ],
-            [
+                'endpoint' => $validated['endpoint'],
                 'public_key' => $validated['keys']['p256dh'],
                 'auth_token' => $validated['keys']['auth'],
-                'content_encoding' => 'aesgcm'
-            ]
-        );
+                'content_encoding' => 'aesgcm',
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+        }
 
-        Log::info('✅ Suscripción guardada exitosamente', [
-            'subscription_id' => $subscription->id
-        ]);
+        Log::info('✅ Suscripción guardada exitosamente');
 
         return response()->json([
             'success' => true,
