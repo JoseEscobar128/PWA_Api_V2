@@ -819,11 +819,101 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
     }
 
 ===============================================================================
+                   PUSH NOTIFICATIONS ENDPOINTS
+                          (PWA Support)
+===============================================================================
+
+28. GET VAPID PUBLIC KEY (Public)
+    METHOD: GET
+    URL: /api/vapid-public-key
+    AUTHENTICATION: Not Required
+    
+    REQUEST BODY: None
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "publicKey": "string (VAPID public key for push subscription)"
+    }
+    
+    USAGE: Frontend requests this key before subscribing to push notifications.
+
+---
+
+29. SAVE PUSH SUBSCRIPTION (Authenticated)
+    METHOD: POST
+    URL: /api/save-subscription
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST BODY:
+    {
+      "endpoint": "string|url (required) - Browser push endpoint",
+      "keys": {
+        "auth": "string (required) - Authentication secret",
+        "p256dh": "string (required) - Public key"
+      }
+    }
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "message": "Push subscription saved successfully"
+    }
+    
+    ERROR (401):
+    {
+      "success": false,
+      "message": "Unauthenticated"
+    }
+    
+    ERROR (422):
+    {
+      "success": false,
+      "message": "Validation failed",
+      "errors": {
+        "endpoint": ["The endpoint field is required."],
+        "keys.auth": ["The keys.auth field is required."]
+      }
+    }
+    
+    NOTE: This endpoint stores the push subscription for the authenticated user.
+          Multiple devices can have separate subscriptions per user.
+
+---
+
+30. DELETE PUSH SUBSCRIPTION (Authenticated)
+    METHOD: POST
+    URL: /api/delete-subscription
+    AUTHENTICATION: Required (Bearer Token)
+    
+    REQUEST BODY:
+    {
+      "endpoint": "string|url (required) - Browser push endpoint to remove"
+    }
+    
+    RESPONSE (200):
+    {
+      "success": true,
+      "message": "Push subscription deleted successfully"
+    }
+    
+    ERROR (422):
+    {
+      "success": false,
+      "message": "Validation failed",
+      "errors": {
+        "endpoint": ["The endpoint field is required."]
+      }
+    }
+    
+    NOTE: Call this when user logs out or disables notifications.
+
+===============================================================================
                       PLACE VOTES ENDPOINTS
                        (Authenticated Users)
 ===============================================================================
 
-24. LIST VOTES (Authenticated - Optional place_id filter)
+31. LIST VOTES (Authenticated - Optional place_id filter)
     METHOD: GET
     URL: /api/votes?place_id={id}
     AUTHENTICATION: Required (Bearer Token)
@@ -849,7 +939,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
 
 ---
 
-25. CHECK IF USER VOTED (Authenticated)
+32. CHECK IF USER VOTED (Authenticated)
     METHOD: GET
     URL: /api/votes/{place_id}
     AUTHENTICATION: Required (Bearer Token)
@@ -873,7 +963,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
 
 ---
 
-26. VOTE FOR PLACE (Authenticated - One Vote Per User/Place)
+33. VOTE FOR PLACE (Authenticated - One Vote Per User/Place)
     METHOD: POST
     URL: /api/votes
     AUTHENTICATION: Required (Bearer Token)
@@ -900,7 +990,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
 
 ---
 
-27. REMOVE VOTE (Authenticated)
+34. REMOVE VOTE (Authenticated)
     METHOD: DELETE
     URL: /api/votes/{place_id}
     AUTHENTICATION: Required (Bearer Token)
@@ -1081,19 +1171,19 @@ EXAMPLE 8: Remove Vote
   curl -X DELETE http://localhost:8000/api/votes/1 \
     -H "Authorization: Bearer {token}"
 
-===============================================================================
-                         SOFT DELETE NOTES
-===============================================================================
+EXAMPLE 9: Get VAPID Public Key
+  curl -X GET http://localhost:8000/api/vapid-public-key
 
-The following resources support soft deletes (marked as deleted but not removed):
-  - Places (deleted_at field)
-  - Photos (deleted_at field)
-  - Reviews (deleted_at field)
-  - PlaceVotes (deleted_at field)
-
-When querying, soft-deleted records are automatically excluded by default.
-To include/restore soft-deleted records, admin policies would need to be extended.
-
+EXAMPLE 10: Subscribe to Push Notifications
+  curl -X POST http://localhost:8000/api/save-subscription \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer {token}" \
+    -d '{
+      "endpoint": "https://fcm.googleapis.com/fcm/send/...",
+      "keys": {
+        "auth": "authentication-secret",
+        "p256dh": "public-key"
+      }
 ===============================================================================
                          FEATURES SUMMARY
 ===============================================================================
@@ -1103,6 +1193,75 @@ To include/restore soft-deleted records, admin policies would need to be extende
   - User role: can create own resources, edit/delete own content
 
 ✓ Standardized JSON responses
+  - All endpoints return { success, data, message?, errors? }
+  - Consistent error format
+
+✓ Validation
+  - All inputs validated
+  - Field-level error responses
+
+✓ Soft deletes
+  - Deleted records remain in database with deleted_at timestamp
+
+✓ Relationship loading
+  - Places returned with photos, reviews, votes
+  - Reviews returned with user and place data
+
+✓ File uploads
+  - Photos stored in public/storage/places/
+  - Old files deleted when replaced
+
+✓ Ownership checks
+  - Users can only edit/delete their own resources
+  - Admins can edit/delete any resource
+
+✓ Push Notifications (PWA)
+  - Web Push API integration via VAPID keys
+  - Multi-device support per user
+  - Notifications for new reviews and votes
+  - Admin alerts for moderation tasks
+  - Automatic cleanup on logout
+
+===============================================================================
+                   PUSH NOTIFICATIONS SYSTEM
+===============================================================================
+
+BACKEND NOTIFICATIONS:
+  When specific events occur, the backend automatically sends push notifications:
+  
+  1. New Review on User's Place
+     - Notification sent to place owner
+     - Includes reviewer name and rating
+     - Triggered in ReviewController when review is created
+  
+  2. New Vote on User's Place
+     - Notification sent to place owner
+     - Shows voter name and total votes
+     - Triggered in PlaceVoteController when vote is added
+  
+  3. Admin Alerts
+     - New place created (requires moderation)
+     - Reported reviews (inappropriate content)
+     - Suspicious voting patterns detected
+     - Sent to all users with admin role
+
+NOTIFICATION STRUCTURE:
+  All push notifications include:
+  - title: Notification heading
+  - body: Message content
+  - icon: App icon (icon-192x192.png)
+  - action: Click action identifier
+  - data: Additional context (IDs, URLs, etc.)
+
+FRONTEND INTEGRATION:
+  1. Request permission for notifications
+  2. Get VAPID public key from /api/vapid-public-key
+  3. Subscribe to push notifications using browser API
+  4. Send subscription to /api/save-subscription
+  5. Handle notifications in service worker
+  6. On logout, call /api/delete-subscription
+
+===============================================================================
   - All endpoints return { success, data, message?, errors? }
   - Consistent error format
 
