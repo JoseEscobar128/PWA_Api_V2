@@ -50,11 +50,24 @@ class UserController extends Controller
                 'last_name' => 'required|string|min:2|max:255',
                 'email'     => 'required|email|unique:users,email,NULL,id,deleted_at,NULL',
                 'password'  => 'required|min:8',
+                'role'      => 'sometimes|string|exists:roles,name',
             ]);
 
             $validated['password'] = Hash::make($validated['password']);
 
+            // Remove role from validated to avoid mass assignment error
+            $roleName = $validated['role'] ?? null;
+            unset($validated['role']);
+
             $user = User::create($validated);
+
+            // Asignar rol si se envió
+            if ($roleName) {
+                $role = \App\Models\Role::where('name', $roleName)->first();
+                if ($role) {
+                    $user->roles()->attach($role->id);
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -64,7 +77,8 @@ class UserController extends Controller
                     'last_name' => $user->last_name,
                     'email' => $user->email,
                     'created_at' => $user->created_at,
-                    'updated_at' => $user->updated_at
+                    'updated_at' => $user->updated_at,
+                    'roles' => $user->roles->pluck('name'),
                 ],
                 'message' => 'User created'
             ], 201);
