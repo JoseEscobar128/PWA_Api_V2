@@ -182,10 +182,24 @@ class AuthController extends Controller
                 'html' => $html,
             ]);
             
-            // Verificar si el envío fue exitoso (statusCode 200)
-            return $response->statusCode === 200;
+            // Log detallado de la respuesta
+            \Log::info('Resend API Response', [
+                'response_object' => get_class($response),
+                'response_id' => $response->id ?? null,
+                'response_properties' => (array)$response,
+                'user_email' => $user->email
+            ]);
+            
+            // Verificar si el envío fue exitoso - Resend devuelve un objeto con 'id' si es exitoso
+            return !empty($response->id);
         } catch (\Exception $e) {
-            \Log::error('Error sending 2FA email: ' . $e->getMessage());
+            \Log::error('Error sending 2FA email', [
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return false;
         }
     }
