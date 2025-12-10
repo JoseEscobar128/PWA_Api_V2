@@ -17,7 +17,7 @@ NOTA SOBRE ROLES:
   - Cada usuario solo puede tener un rol asignado ("user" o "admin").
   - Si se asigna un nuevo rol, se reemplaza el anterior.
 
-1. REGISTER (Public)
+1. REGISTER (Public - Requires 2FA Verification)
    METHOD: POST
    URL: /api/register
    AUTHENTICATION: No
@@ -42,9 +42,11 @@ NOTA SOBRE ROLES:
        "created_at": "datetime",
        "updated_at": "datetime"
      },
-     "token": "string",
-     "message": "User registered successfully"
+     "message": "Usuario registrado. Código 2FA enviado a tu correo",
+     "requires_2fa": true
    }
+   
+   NEXT STEP: User must verify 2FA code using POST /verify-2fa to get token.
    
    ERROR (422):
    {
@@ -58,7 +60,7 @@ NOTA SOBRE ROLES:
 
 ---
 
-2. LOGIN (Public)
+2. LOGIN (Public - Requires 2FA Verification)
    METHOD: POST
    URL: /api/login
    AUTHENTICATION: No
@@ -66,28 +68,29 @@ NOTA SOBRE ROLES:
    REQUEST BODY:
    {
      "email": "string|email (required)",
-     "password": "string|min:8 (required)"
+     "password": "string|min:8 (required)",
+     "recaptchaResponse": "string (required)"
    }
    
    RESPONSE (200):
    {
      "success": true,
-     "data": {
-       "user": {
-         "id": integer,
-         "name": "string",
-         "last_name": "string",
-         "email": "string"
-       },
-       "token": "string"
-     },
-     "message": "Login successful"
+     "message": "Código 2FA enviado a tu correo",
+     "requires_2fa": true
    }
+   
+   NEXT STEP: User must verify 2FA code using POST /verify-2fa to get token.
    
    ERROR (401):
    {
      "success": false,
      "message": "Invalid credentials"
+   }
+   
+   ERROR (422):
+   {
+     "success": false,
+     "message": "Captcha no válido"
    }
 
 ---
@@ -112,6 +115,87 @@ NOTA SOBRE ROLES:
 
 ---
 
+4. VERIFY 2FA CODE (Public - After Register or Login)
+   METHOD: POST
+   URL: /api/verify-2fa
+   AUTHENTICATION: No
+   
+   REQUEST BODY:
+   {
+     "email": "string|email (required)",
+     "code": "string (required, 6 digits)"
+   }
+   
+   RESPONSE (200):
+   {
+     "success": true,
+     "message": "Autenticado correctamente",
+     "token": "string (use this for authenticated requests)",
+     "is_verified": true
+   }
+   
+   ERROR (404):
+   {
+     "success": false,
+     "error": "Usuario no encontrado"
+   }
+   
+   ERROR (400 - Código expirado):
+   {
+     "success": false,
+     "error": "Código expirado. Solicita uno nuevo con /resend-2fa"
+   }
+   
+   ERROR (400 - Código ya usado):
+   {
+     "success": false,
+     "error": "Código ya utilizado. Solicita uno nuevo con /resend-2fa"
+   }
+   
+   ERROR (400 - Código incorrecto):
+   {
+     "success": false,
+     "error": "Código inválido. Verifica que sea correcto."
+   }
+   
+   ERROR (422):
+   {
+     "success": false,
+     "message": "Validación fallida",
+     "errors": {
+       "email": ["The email field is required."],
+       "code": ["The code field is required."]
+     }
+   }
+   
+   NOTE: Code expires in 10 minutes. Use /resend-2fa to request a new code.
+
+---
+
+5. RESEND 2FA CODE (Public)
+   METHOD: POST
+   URL: /api/resend-2fa
+   AUTHENTICATION: No
+   
+   REQUEST BODY:
+   {
+     "email": "string|email (required)"
+   }
+   
+   RESPONSE (200):
+   {
+     "message": "Código 2FA reenviado a tu correo"
+   }
+   
+   ERROR (404):
+   {
+     "message": "User not found"
+   }
+   
+   NOTE: Use this when the user doesn't receive the initial 2FA code.
+
+---
+
 4. GET CURRENT USER (Authenticated)
    METHOD: GET
    URL: /api/me
@@ -127,7 +211,8 @@ NOTA SOBRE ROLES:
        "name": "string",
        "last_name": "string",
        "email": "string",
-      "role": "user" | "admin",
+       "is_verified": boolean,
+       "role": "user" | "admin",
        "created_at": "datetime",
        "updated_at": "datetime"
      }
@@ -1269,6 +1354,68 @@ FRONTEND INTEGRATION:
   4. Send subscription to /api/save-subscription
   5. Handle notifications in service worker
   6. On logout, call /api/delete-subscription
+
+===============================================================================
+                   2FA (TWO-FACTOR AUTHENTICATION) FLOW
+===============================================================================
+
+OVERVIEW:
+  2FA is required for both registration and login.
+  Users receive a 6-digit code via email (Resend) that expires in 10 minutes.
+  The code must be verified to obtain an authentication token.
+
+REGISTRATION WITH 2FA:
+  1. POST /api/register
+     → Returns: requires_2fa: true
+     → Email: Code sent to user's email
+  
+  2. POST /api/verify-2fa
+     → Input: email + code
+     → Returns: token + is_verified: true
+     → User status in DB: is_verified = true
+
+LOGIN WITH 2FA:
+  1. POST /api/login
+     → Returns: requires_2fa: true
+     → Email: Code sent to user's email
+  
+  2. POST /api/verify-2fa
+     → Input: email + code
+     → Returns: token + is_verified: true
+
+RESEND CODE:
+  POST /api/resend-2fa
+  → Input: email
+  → Returns: Message confirming code resent
+  → Use when code expires or user didn't receive it
+
+DATA STORAGE:
+  - Table: two_factor_codes
+    Columns: id, user_id, code, used, expires_at, created_at, updated_at
+  - Table: users
+    Column: is_verified (boolean, default: false)
+
+CODE EXPIRATION:
+  - Expires in: 10 minutes
+  - After 10 min: Code becomes invalid
+  - Solution: Use /api/resend-2fa to get a new code
+
+EXAMPLE FLOW:
+  Step 1: User registers
+    POST /api/register
+    {"name":"Jose","last_name":"Escobar","email":"jose@correo.com","password":"pass123","password_confirmation":"pass123"}
+    Response: requires_2fa: true (email sent)
+  
+  Step 2: User checks email, gets code (e.g., 123456)
+  
+  Step 3: User verifies code
+    POST /api/verify-2fa
+    {"email":"jose@correo.com","code":"123456"}
+    Response: token + is_verified: true
+  
+  Step 4: User uses token for authenticated requests
+    GET /api/me
+    Header: Authorization: Bearer TOKEN
 
 ===============================================================================
   - All endpoints return { success, data, message?, errors? }

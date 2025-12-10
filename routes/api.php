@@ -22,6 +22,10 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 
+// 2FA endpoints
+Route::post('/verify-2fa', [AuthController::class, 'verify2FA']);
+Route::post('/resend-2fa', [AuthController::class, 'resend2FA']);
+
 // User profile update — any authenticated user can update their own profile
 Route::middleware('auth:sanctum')->put('/users/{id}', [UserController::class, 'update']);
 

@@ -9,6 +9,191 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    /**
+     * Reenvía el código 2FA por correo
+     */
+    public function resend2FA(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+        $user = \App\Models\User::where('email', $request->email)->firstOrFail();
+        $this->send2FA($user);
+        return response()->json([
+            'message' => 'Código 2FA reenviado a tu correo'
+        ]);
+    }
+
+    /**
+     * Verifica el código 2FA y entrega el token
+     */
+    public function verify2FA(Request $request)
+    {
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'code' => 'required|string',
+            ]);
+
+            $user = \App\Models\User::where('email', $request->email)->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Usuario no encontrado'
+                ], 404);
+            }
+
+            $validCode = $user->twoFactorCodes()
+                ->where('code', $request->code)
+                ->where('used', false)
+                ->where('expires_at', '>', now())
+                ->first();
+
+            if (!$validCode) {
+                // Verificar si el código existe pero está expirado
+                $expiredCode = $user->twoFactorCodes()
+                    ->where('code', $request->code)
+                    ->where('used', false)
+                    ->where('expires_at', '<=', now())
+                    ->first();
+
+                if ($expiredCode) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Código expirado. Solicita uno nuevo con /resend-2fa'
+                    ], 400);
+                }
+
+                // Verificar si el código fue usado
+                $usedCode = $user->twoFactorCodes()
+                    ->where('code', $request->code)
+                    ->where('used', true)
+                    ->first();
+
+                if ($usedCode) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Código ya utilizado. Solicita uno nuevo con /resend-2fa'
+                    ], 400);
+                }
+
+                // Código incorrecto
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Código inválido. Verifica que sea correcto.'
+                ], 400);
+            }
+
+            $validCode->update(['used' => true]);
+            $user->is_verified = true;
+            $user->save();
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Autenticado correctamente',
+                'token' => $token,
+                'is_verified' => true
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validación fallida',
+                'errors' => $ve->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al verificar el código. Intenta de nuevo.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Envía el código 2FA por correo usando Resend
+     */
+    public function send2FA(User $user)
+    {
+        $code = $this->generate2FA($user);
+        
+        $html = "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+                .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; }
+                .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
+                .content { padding: 40px 20px; text-align: center; }
+                .code-box { background-color: #f9f9f9; border: 2px solid #667eea; border-radius: 8px; padding: 30px; margin: 30px 0; }
+                .code-box p { margin: 0 0 10px 0; font-size: 14px; color: #666; }
+                .code { font-size: 48px; font-weight: bold; color: #667eea; letter-spacing: 5px; font-family: 'Courier New', monospace; }
+                .expiration { font-size: 12px; color: #999; margin-top: 15px; }
+                .footer { background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #ddd; }
+                .info { background-color: #f0f7ff; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; text-align: left; font-size: 13px; color: #333; border-radius: 4px; }
+                .button { background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 20px 0; font-weight: 600; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>Verificación de Seguridad</h1>
+                </div>
+                
+                <div class='content'>
+                    <p style='font-size: 16px; color: #333; margin-bottom: 10px;'>¡Hola <strong>{$user->name}</strong>!</p>
+                    <p style='font-size: 14px; color: #666; margin-bottom: 30px;'>Bienvenido a SnapPlace. Tu código de verificación es:</p>
+                    
+                    <div class='code-box'>
+                        <p>CÓDIGO DE VERIFICACIÓN</p>
+                        <div class='code'>$code</div>
+                        <div class='expiration'>Este código expira en 10 minutos</div>
+                    </div>
+                    
+                    <div class='info'>
+                        <strong>🔒 Información importante:</strong><br>
+                        • Nunca compartas este código con nadie<br>
+                        • Nuestro equipo nunca te pedirá este código por mensaje<br>
+                        • Si no solicitaste este código, ignora este correo
+                    </div>
+                    
+                    <p style='font-size: 13px; color: #999; margin-top: 30px;'>¿Problemas? Si no recibiste el código, puedes solicitar uno nuevo desde la aplicación.</p>
+                </div>
+                
+                <div class='footer'>
+                    <p>Este es un correo automático, por favor no respondas.<br>
+                    © 2025 SnapPlace. Todos los derechos reservados.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        ";
+        
+        \Resend\Laravel\Facades\Resend::emails()->send([
+            'from' => 'no-reply@pagina-prueba.com',
+            'to' => $user->email,
+            'subject' => 'Tu código de verificación - 2FA',
+            'html' => $html,
+        ]);
+    }
+
+    /**
+     * Genera y guarda el código 2FA para el usuario
+     */
+    public function generate2FA(User $user)
+    {
+        $code = rand(100000, 999999);
+        $user->twoFactorCodes()->create([
+            'code' => $code,
+            'expires_at' => now()->addMinutes(10),
+            'used' => false,
+        ]);
+        return $code;
+    }
     public function register(Request $request)
     {
         try {
@@ -22,7 +207,8 @@ class AuthController extends Controller
             $data['password'] = Hash::make($data['password']);
             $user = User::create($data);
 
-            $token = $user->createToken('auth_token')->plainTextToken;
+            // Enviar código 2FA por correo
+            $this->send2FA($user);
 
             return response()->json([
                 'success' => true,
@@ -34,8 +220,8 @@ class AuthController extends Controller
                     'created_at' => $user->created_at,
                     'updated_at' => $user->updated_at
                 ],
-                'token' => $token,
-                'message' => 'User registered successfully'
+                'message' => 'Usuario registrado. Código 2FA enviado a tu correo',
+                'requires_2fa' => true
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             return response()->json([
@@ -88,20 +274,13 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            $token = $user->createToken('auth_token')->plainTextToken;
+            // Enviar código 2FA por correo
+            $this->send2FA($user);
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'user' => [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'last_name' => $user->last_name,
-                        'email' => $user->email
-                    ],
-                    'token' => $token
-                ],
-                'message' => 'Login successful'
+                'message' => 'Código 2FA enviado a tu correo',
+                'requires_2fa' => true
             ], 200);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             return response()->json([

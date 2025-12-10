@@ -13,6 +13,11 @@ use NotificationChannels\WebPush\PushSubscription;
 
 class User extends Authenticatable
 {
+    public function twoFactorCodes()
+    {
+        return $this->hasMany(\App\Models\TwoFactorCode::class);
+    }
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasApiTokens, SoftDeletes;
 
@@ -26,7 +31,12 @@ class User extends Authenticatable
         'last_name',
         'email',
         'password',
-        
+        'is_verified',
+    ];
+    protected $casts = [
+        'is_verified' => 'boolean',
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
     ];
 
     /**
@@ -73,14 +83,4 @@ class User extends Authenticatable
             ->where('subscribable_id', $this->id)
             ->get();
     }
-
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string,string>
-     */
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-    ];
 }
