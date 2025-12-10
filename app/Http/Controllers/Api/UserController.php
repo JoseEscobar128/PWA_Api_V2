@@ -140,13 +140,28 @@ class UserController extends Controller
                 'last_name' => 'sometimes|string|min:2|max:255',
                 'email'     => 'sometimes|email|unique:users,email,' . $user->id . ',id,deleted_at,NULL',
                 'password'  => 'sometimes|min:8',
+                'role'      => 'sometimes|string|exists:roles,name',
             ]);
 
             if (isset($validated['password'])) {
                 $validated['password'] = Hash::make($validated['password']);
             }
 
+            // Cambiar rol solo si el usuario autenticado es admin y se envió 'role'
+            $roleName = $validated['role'] ?? null;
+            unset($validated['role']);
+
             $user->update($validated);
+
+            if ($roleName) {
+                $authUser = $request->user();
+                if ($authUser && $authUser->roles()->where('name', 'admin')->exists()) {
+                    $role = \App\Models\Role::where('name', $roleName)->first();
+                    if ($role) {
+                        $user->roles()->sync([$role->id]);
+                    }
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -155,7 +170,8 @@ class UserController extends Controller
                     'name' => $user->name,
                     'last_name' => $user->last_name,
                     'email' => $user->email,
-                    'updated_at' => $user->updated_at
+                    'updated_at' => $user->updated_at,
+                    'roles' => $user->roles->pluck('name'),
                 ],
                 'message' => 'User updated'
             ], 200);
