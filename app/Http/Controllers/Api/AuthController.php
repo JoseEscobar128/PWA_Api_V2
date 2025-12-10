@@ -190,8 +190,9 @@ class AuthController extends Controller
                 'user_email' => $user->email
             ]);
             
-            // Verificar si el envío fue exitoso - Resend devuelve un objeto con 'id' si es exitoso
-            return !empty($response->id);
+            // Verificar si el envío fue exitoso - Resend devuelve un objeto Email con 'id' si es exitoso
+            // El id puede estar en $response->id o accesible a través del objeto
+            return isset($response->id) && !empty($response->id);
         } catch (\Exception $e) {
             \Log::error('Error sending 2FA email', [
                 'message' => $e->getMessage(),
