@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -14,14 +15,49 @@ class AuthController extends Controller
      */
     public function resend2FA(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-        ]);
-        $user = \App\Models\User::where('email', $request->email)->firstOrFail();
-        $this->send2FA($user);
-        return response()->json([
-            'message' => 'Código 2FA reenviado a tu correo'
-        ]);
+        try {
+            $request->validate([
+                'email' => 'required|email',
+            ]);
+            
+            $user = \App\Models\User::where('email', $request->email)->first();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+            
+            $emailSent = $this->send2FA($user);
+            
+            if (!$emailSent) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo enviar el código 2FA. Intenta de nuevo.'
+                ], 500);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Código 2FA reenviado a tu correo'
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $ve->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Resend 2FA error', [
+                'message' => $e->getMessage(),
+                'email' => $request->email ?? null
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al reenviar el código 2FA'
+            ], 500);
+        }
     }
 
     /**
@@ -183,7 +219,7 @@ class AuthController extends Controller
             ]);
             
             // Log detallado de la respuesta
-            \Log::info('Resend API Response', [
+            Log::info('Resend API Response', [
                 'response_object' => get_class($response),
                 'response_id' => $response->id ?? null,
                 'response_properties' => (array)$response,
@@ -195,7 +231,7 @@ class AuthController extends Controller
             $emailId = $response->id;
             return !empty($emailId) && is_string($emailId);
         } catch (\Exception $e) {
-            \Log::error('Error sending 2FA email', [
+            Log::error('Error sending 2FA email', [
                 'message' => $e->getMessage(),
                 'code' => $e->getCode(),
                 'file' => $e->getFile(),
@@ -222,7 +258,7 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         try {
-            \Log::info('Register request started', ['email' => $request->email]);
+            Log::info('Register request started', ['email' => $request->email]);
             
             $data = $request->validate([
                 'name' => 'required|string|min:2|max:255',
@@ -231,22 +267,22 @@ class AuthController extends Controller
                 'password' => 'required|min:8|confirmed'
             ]);
 
-            \Log::info('Validation passed', ['email' => $data['email']]);
+            Log::info('Validation passed', ['email' => $data['email']]);
 
             $data['password'] = Hash::make($data['password']);
             $user = User::create($data);
 
-            \Log::info('User created', ['user_id' => $user->id, 'email' => $user->email]);
+            Log::info('User created', ['user_id' => $user->id, 'email' => $user->email]);
 
             // Intentar enviar código 2FA
             $emailSent = $this->send2FA($user);
             
-            \Log::info('Send 2FA result', ['emailSent' => $emailSent, 'user_id' => $user->id]);
+            Log::info('Send 2FA result', ['emailSent' => $emailSent, 'user_id' => $user->id]);
             
             if (!$emailSent) {
                 // Si falla el envío de correo, eliminar el usuario registrado y retornar error
                 $user->delete();
-                \Log::info('User deleted due to email failure', ['user_id' => $user->id]);
+                Log::info('User deleted due to email failure', ['user_id' => $user->id]);
                 
                 return response()->json([
                     'success' => false,
@@ -269,14 +305,14 @@ class AuthController extends Controller
                 'requires_2fa' => true
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $ve) {
-            \Log::warning('Validation failed', ['errors' => $ve->errors()]);
+            Log::warning('Validation failed', ['errors' => $ve->errors()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
                 'errors' => $ve->errors()
             ], 422);
         } catch (\Exception $e) {
-            \Log::error('Register error', [
+            Log::error('Register error', [
                 'message' => $e->getMessage(),
                 'code' => $e->getCode(),
                 'file' => $e->getFile(),
