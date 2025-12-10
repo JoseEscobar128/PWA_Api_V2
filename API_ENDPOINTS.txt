@@ -13,6 +13,10 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
                           AUTH ENDPOINTS
 ===============================================================================
 
+NOTA SOBRE ROLES:
+  - Cada usuario solo puede tener un rol asignado ("user" o "admin").
+  - Si se asigna un nuevo rol, se reemplaza el anterior.
+
 1. REGISTER (Public)
    METHOD: POST
    URL: /api/register
@@ -123,7 +127,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
        "name": "string",
        "last_name": "string",
        "email": "string",
-       "roles": ["user", "admin"],
+      "role": "user" | "admin",
        "created_at": "datetime",
        "updated_at": "datetime"
      }
@@ -212,7 +216,8 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
      "name": "string|min:2|max:255 (required)",
      "last_name": "string|min:2|max:255 (required)",
      "email": "string|email|unique (required)",
-     "password": "string|min:8 (required)"
+     "password": "string|min:8 (required)",
+     "role": "string|in:user,admin (opcional, default: user)"
    }
    
    RESPONSE (201):
@@ -223,6 +228,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
        "name": "string",
        "last_name": "string",
        "email": "string",
+       "role": "user" | "admin",
        "created_at": "datetime",
        "updated_at": "datetime"
      },
@@ -251,7 +257,8 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
      "name": "string|min:2|max:255 (optional)",
      "last_name": "string|min:2|max:255 (optional)",
      "email": "string|email (optional)",
-     "password": "string|min:8 (optional)"
+     "password": "string|min:8 (optional)",
+     "role": "string|in:user,admin (opcional)"
    }
    
    RESPONSE (200):
@@ -262,6 +269,7 @@ AUTHENTICATION: Bearer Token (Laravel Sanctum)
        "name": "string",
        "last_name": "string",
        "email": "string",
+       "role": "user" | "admin",
        "updated_at": "datetime"
      },
      "message": "User updated"
@@ -1189,8 +1197,9 @@ EXAMPLE 10: Subscribe to Push Notifications
 ===============================================================================
 
 ✓ Role-based access control (RBAC)
-  - Admin role: can manage users, edit/delete any resource
-  - User role: can create own resources, edit/delete own content
+  - Admin role: puede gestionar usuarios y editar/eliminar cualquier recurso
+  - User role: puede crear y editar/eliminar solo sus propios recursos
+  - Solo se permite un rol por usuario (user o admin)
 
 ✓ Standardized JSON responses
   - All endpoints return { success, data, message?, errors? }

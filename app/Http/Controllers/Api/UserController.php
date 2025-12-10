@@ -65,7 +65,8 @@ class UserController extends Controller
             if ($roleName) {
                 $role = \App\Models\Role::where('name', $roleName)->first();
                 if ($role) {
-                    $user->roles()->attach($role->id);
+                    // Limitar a un solo rol: usar sync
+                    $user->roles()->sync([$role->id]);
                 }
             }
 
@@ -158,6 +159,7 @@ class UserController extends Controller
                 if ($authUser && $authUser->roles()->where('name', 'admin')->exists()) {
                     $role = \App\Models\Role::where('name', $roleName)->first();
                     if ($role) {
+                        // Limitar a un solo rol: usar sync
                         $user->roles()->sync([$role->id]);
                     }
                 }
