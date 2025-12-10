@@ -28,8 +28,8 @@ class DatabaseSeeder extends Seeder
         $admin = User::create([
             'name' => 'Admin',
             'last_name' => 'Administrator',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('admin123456'),
+            'email' => 'guillermoescobar128@gmail.com',
+            'password' => Hash::make('Admin123456'),
         ]);
         $admin->roles()->attach($adminRole->id);
 
